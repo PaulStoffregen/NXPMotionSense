@@ -41,6 +41,17 @@ void loop() {
     Serial.print(pitch);
     Serial.print(" ");
     Serial.println(roll);
+
+    // Uncomment following lines to use internal quaternion for orientation (doesn't suffer from gimbal lock issues).
+    // NXPSensorFusion::Quaternion_t quaternion = filter.getQuaternion();
+    // Serial.print("Orientation: ");
+    // Serial.print(quaternion.q0, 5);
+    // Serial.print(" ");
+    // Serial.print(quaternion.q1, 5);
+    // Serial.print(" ");
+    // Serial.print(quaternion.q2, 5);
+    // Serial.print(" ");
+    // Serial.println(quaternion.q3, 5);
   }
 }
 
