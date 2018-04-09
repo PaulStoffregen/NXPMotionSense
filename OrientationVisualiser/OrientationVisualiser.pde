@@ -5,6 +5,14 @@ float yaw = 0.0;
 float pitch = 0.0;
 float roll = 0.0;
 
+// rotation quaternion
+float w = 1;
+float x = 0;
+float y = 0;
+float z = 0;
+
+boolean isQuaternionDataAvailable = false;
+
 void setup()
 {
   size(600, 500, P3D);
@@ -32,29 +40,58 @@ void draw()
 
   pushMatrix(); // begin object
 
-  float c1 = cos(radians(roll));
-  float s1 = sin(radians(roll));
-  float c2 = cos(radians(-pitch));
-  float s2 = sin(radians(-pitch));
-  float c3 = cos(radians(yaw));
-  float s3 = sin(radians(yaw));
-  applyMatrix( c2*c3, s1*s3+c1*c3*s2, c3*s1*s2-c1*s3, 0,
-               -s2, c1*c2, c2*s1, 0,
-               c2*s3, c1*s2*s3-c3*s1, c1*c3+s1*s2*s3, 0,
-               0, 0, 0, 1);
+  if(isQuaternionDataAvailable) {
+    final float xx = x * x;
+    final float xy = x * y;
+    final float xz = x * z;
+    final float xw = x * w;
+    final float yy = y * y;
+    final float yz = y * z;
+    final float yw = y * w;
+    final float zz = z * z;
+    final float zw = z * w;
 
+    applyMatrix( 1-2*(yy+zz), 2*(xy-zw), 2*(xz+yw), 0,
+                 2*(xy+zw), 1-2*(xx+zz), 2*(yz-xw), 0,
+                 2*(xz-yw), 2*(yz+xw), 1-2*(xx+yy), 0,
+                 0, 0, 0, 1 );
+  }
+  else {
+    float c1 = cos(radians(roll));
+    float s1 = sin(radians(roll));
+    float c2 = cos(radians(-pitch));
+    float s2 = sin(radians(-pitch));
+    float c3 = cos(radians(yaw));
+    float s3 = sin(radians(yaw));
+    applyMatrix( c2*c3, s1*s3+c1*c3*s2, c3*s1*s2-c1*s3, 0,
+                 -s2, c1*c2, c2*s1, 0,
+                 c2*s3, c1*s2*s3-c3*s1, c1*c3+s1*s2*s3, 0,
+                 0, 0, 0, 1 );
+  }
   drawPropShield();
   //drawArduino();
 
   popMatrix(); // end of object
 
   // Print values to console
-  print(roll);
-  print("\t");
-  print(-pitch);
-  print("\t");
-  print(yaw);
-  println();
+  if(isQuaternionDataAvailable) {
+    print(w);
+    print("\t");
+    print(x);
+    print("\t");
+    print(y);
+    print("\t");
+    print(z);
+    println();
+  }
+  else {
+    print(roll);
+    print("\t");
+    print(-pitch);
+    print("\t");
+    print(yaw);
+    println();
+  }
 }
 
 void serialEvent()
@@ -66,9 +103,27 @@ void serialEvent()
     if (message != null) {
       String[] list = split(trim(message), " ");
       if (list.length >= 4 && list[0].equals("Orientation:")) {
-        yaw = float(list[1]); // convert to float yaw
-        pitch = float(list[2]); // convert to float pitch
-        roll = float(list[3]); // convert to float roll
+        if(list.length == 4) {
+          isQuaternionDataAvailable = false;
+
+          yaw = float(list[1]); // convert to float yaw
+          pitch = float(list[2]); // convert to float pitch
+          roll = float(list[3]); // convert to float roll
+        }
+        else {
+          isQuaternionDataAvailable = true;
+
+          w = float(list[1]);
+          x = float(list[2]);
+          y = float(list[3]);
+          z = float(list[4]);
+
+          // convert from device coordinate system (Z-Y-X) to OpenGL coordinate system
+          float temp = y;
+          y = z;
+          z = temp;
+          w = -w;
+        }
       }
     }
   } while (message != null);
