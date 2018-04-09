@@ -116,6 +116,12 @@ public:
 		float q2; // y
 		float q3; // z
 	} Quaternion_t;
+	void getQuaternion(float quat[4]) {
+		quat[0] = qPl.q0;
+		quat[1] = qPl.q1;
+		quat[2] = qPl.q2;
+		quat[3] = qPl.q3;
+	}
 	// These are Madgwick & Mahony - extrinsic rotation reference (wrong!)
 	//float getPitch() {return atan2f(2.0f * qPl.q2 * qPl.q3 - 2.0f * qPl.q0 * qPl.q1, 2.0f * qPl.q0 * qPl.q0 + 2.0f * qPl.q3 * qPl.q3 - 1.0f);};
 	//float getRoll() {return -1.0f * asinf(2.0f * qPl.q1 * qPl.q3 + 2.0f * qPl.q0 * qPl.q2);};
