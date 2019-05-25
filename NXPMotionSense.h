@@ -1,5 +1,6 @@
 #ifndef _NXP_Motion_Sensors_
 #define _NXP_Motion_Sensors_
+#include "utility/NXPSensorRegisters.h"
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -12,7 +13,7 @@
 
 class NXPMotionSense {
 public:
-	bool begin();
+	bool begin(int fxos8700addr = FXOS8700_I2C_ADDR0, int fxas21002addr = FXAS21002_I2C_ADDR0, bool use_mpl3115 = true);
 	bool available() {
 		update();
 		if (newdata) return true;
@@ -99,6 +100,10 @@ private:
 	int16_t gyro_raw[3];
 	int16_t temperature_raw;
 	uint8_t newdata;
+	
+	int _fxos8700addr;
+	int _fxas21002addr;
+	bool _use_mpl3115;
 };
 
 

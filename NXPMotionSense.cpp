@@ -6,11 +6,15 @@
 #define NXP_MOTION_CAL_EEADDR  60
 #define NXP_MOTION_CAL_SIZE    68
 
-bool NXPMotionSense::begin()
+bool NXPMotionSense::begin(int fxos8700addr , int fxas21002addr , bool use_mpl3115 )
 {
 	unsigned char buf[NXP_MOTION_CAL_SIZE];
 	uint8_t i;
 	uint16_t crc;
+	
+	_fxos8700addr = fxos8700addr;
+	_fxas21002addr = fxas21002addr;
+	_use_mpl3115 = use_mpl3115;
 
 	Wire.begin();
 	Wire.setClock(400000);
@@ -27,9 +31,12 @@ bool NXPMotionSense::begin()
 		Serial.println("config error FXAS21002");
 		delay(1000);
 	}
-	while (!MPL3115_begin()) {
-		Serial.println("config error MPL3115");
-		delay(1000);
+	if(_use_mpl3115)
+	{
+		while (!MPL3115_begin()) {
+			Serial.println("config error MPL3115");
+			delay(1000);
+		}
 	}
 	//Serial.println("init done");
 
@@ -59,7 +66,7 @@ void NXPMotionSense::update()
 	if (FXOS8700_read(accel_mag_raw)) { // accel + mag
 		//Serial.println("accel+mag");
 	}
-	if (MPL3115_read(&alt, &temperature_raw)) { // alt
+	if (_use_mpl3115 && MPL3115_read(&alt, &temperature_raw)) { // alt
 		//Serial.println("alt");
 	}
 	if (FXAS21002_read(gyro_raw)) {  // gyro
@@ -104,7 +111,7 @@ static bool read_regs(uint8_t i2c, uint8_t *data, uint8_t num)
 
 bool NXPMotionSense::FXOS8700_begin()
 {
-	const uint8_t i2c_addr=FXOS8700_I2C_ADDR0;
+	const uint8_t i2c_addr=_fxos8700addr;
 	uint8_t b;
 
 	//Serial.println("FXOS8700_begin");
@@ -129,7 +136,7 @@ bool NXPMotionSense::FXOS8700_read(int16_t *data)  // accel + mag
 {
 	static elapsedMicros usec_since;
 	static int32_t usec_history=5000;
-	const uint8_t i2c_addr=FXOS8700_I2C_ADDR0;
+	const uint8_t i2c_addr=_fxos8700addr;
 	uint8_t buf[13];
 
 	int32_t usec = usec_since;
@@ -158,7 +165,7 @@ bool NXPMotionSense::FXOS8700_read(int16_t *data)  // accel + mag
 
 bool NXPMotionSense::FXAS21002_begin()
 {
-        const uint8_t i2c_addr=FXAS21002_I2C_ADDR0;
+        const uint8_t i2c_addr=_fxas21002addr;
         uint8_t b;
 
 	if (!read_regs(i2c_addr, FXAS21002_WHO_AM_I, &b, 1)) return false;
@@ -179,7 +186,7 @@ bool NXPMotionSense::FXAS21002_read(int16_t *data) // gyro
 {
 	static elapsedMicros usec_since;
 	static int32_t usec_history=10000;
-	const uint8_t i2c_addr=FXAS21002_I2C_ADDR0;
+	const uint8_t i2c_addr=_fxas21002addr;
 	uint8_t buf[7];
 
 	int32_t usec = usec_since;
