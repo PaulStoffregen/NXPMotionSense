@@ -59,10 +59,10 @@ void NXPMotionSense::update()
 	if (FXOS8700_read(accel_mag_raw)) { // accel + mag
 		//Serial.println("accel+mag");
 	}
-	if (MPL3115_read(&alt, &temperature_raw)) { // alt
+	//if (MPL3115_read(&alt, &temperature_raw)) { // alt
 		//Serial.println("alt");
-		altimeter_rdy = 1;
-	} 
+	//	altimeter_rdy = 1;
+	//} 
 	if (FXAS21002_read(gyro_raw)) {  // gyro
 		//Serial.println("gyro");
 		newdata = 1;
@@ -239,21 +239,6 @@ bool NXPMotionSense::MPL3115_begin() // pressure
 	return true;
 }
 
-bool NXPMotionSense::MPL3115_read(int32_t *altitude, int16_t *temperature)
-{
-	//static elapsedMicros usec_since;
-	//static int32_t usec_history=980000;
-	const uint8_t i2c_addr=MPL3115_I2C_ADDR;
-	uint8_t buf[6];
-
-	readAltitude();
-
-	altimeter_rdy = 1;
-	//Serial.printf("%02X %d %d: ", buf[0], usec, usec_history);
-	//Serial.printf("%f,%f", altitudeM, tempC);
-	//Serial.println();
-	return true;
-}
 
 void NXPMotionSense::readAltitude()
 {

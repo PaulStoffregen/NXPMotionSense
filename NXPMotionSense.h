@@ -91,7 +91,6 @@ public:
 	void readPressure();
 	void readAltitude();
 	float altitudeM, temperatureC, pressure;
-	uint8_t altimeter_rdy = 0;
 	
 private:
 	void update();
@@ -100,7 +99,6 @@ private:
 	bool MPL3115_begin();
 	bool FXOS8700_read(int16_t *data);
 	bool FXAS21002_read(int16_t *data);
-	bool MPL3115_read(int32_t *altitude, int16_t *temperature);
 	void MPL3115_toggleOneShot();
 	
 	float cal[16]; // 0-8=offsets, 9=field strength, 10-15=soft iron map
