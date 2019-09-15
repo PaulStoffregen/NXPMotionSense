@@ -145,7 +145,7 @@
 
 #define MPL3115_I2C_ADDR             0x60 // fixed I2C address
 #define MPL3115_STATUS               0x00 // Sensor Status Register
-#define MPL3115_OUT P_MSB            0x01 // Pressure Data Out MSB
+#define MPL3115_OUT_P_MSB            0x01 // Pressure Data Out MSB
 #define MPL3115_OUT_P_CSB            0x02 // Pressure Data Out CSB
 #define MPL3115_OUT_P_LSB            0x03 // Pressure Data Out LSB
 #define MPL3115_OUT_T_MSB            0x04 // Temperature Data Out MSB

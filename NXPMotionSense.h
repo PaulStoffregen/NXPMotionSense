@@ -5,37 +5,6 @@
 #include <Wire.h>
 #include <EEPROM.h>
 
-
-enum SAMPLERATE {
-  OS_6ms = 0, // 6 ms is minimum oversampling interval, corresponds to an oversample ration of 2^0 = 1 
-  OS_10ms,
-  OS_18ms,
-  OS_34ms,
-  OS_66ms,
-  OS_130ms, // 130 ms oversampling interval, 2^5 = 32 oversample ratio
-  OS_258ms,
-  OS_512ms
-};
-
-enum ST_VALUE {
-  ATS_1s = 0, // 6 ms is minimum oversampling interval, corresponds to an oversample ration of 2^0 = 1 
-  ATS_2s,
-  ATS_4s,
-  ATS_8s,
-  ATS_16s,
-  ATS_32s,
-  ATS_64s, // 2^6 = 64 s interval between up to 32 FIFO samples for half an hour of data logging
-  ATS_128s,
-  ATS_256s,
-  ATS_512s,
-  ATS_1024s,
-  ATS_2048s,
-  ATS_4096s,
-  ATS_8192s,
-  ATS_16384s,
-  ATS_32768s  // 2^15 = 32768 s interval between up to 32 FIFO samples = 12 days of data logging!
-};
-
 // TODO: move these inside class namespace
 #define G_PER_COUNT            0.0001220703125f  // = 1/8192
 #define DEG_PER_SEC_PER_COUNT  0.0625f  // = 1/16
@@ -118,15 +87,11 @@ public:
 		if (fieldstrength != NULL) *fieldstrength = cal[9];
 	}
 	
-	void MPL3115readAltitude();
-	void MPL3115readPressure();
-	void MPL3115toggleOneShot();
-	void MPL3115SampleRate(uint8_t samplerate);
-	void MPL3115TimeStep(uint8_t ST_Value);
-	void setSeaPress(uint16_t sea_press_inp);
-
-	float pressure, temperature, altitude, altimeter_setting_pressure_mb;
-
+	void setSeaPressure(float pascal);
+	void readPressure();
+	float altitudeM, temperatureC, pressure;
+	uint8_t altimeter_rdy = 0;
+	
 private:
 	void update();
 	bool FXOS8700_begin();
@@ -134,28 +99,14 @@ private:
 	bool MPL3115_begin();
 	bool FXOS8700_read(int16_t *data);
 	bool FXAS21002_read(int16_t *data);
-	bool MPL3115_read();
-	
-	void initRealTimeMPL3115();
-	void initFIFOMPL3115();
-	void MPL3115enableEventflags();
-	void MPL3115ActiveAltimeterMode();
-	void MPL3115ActiveBarometerMode();
-	void MPL3115Reset();
-	void MPL3115Standby();
-	void MPL3115Active();
+	bool MPL3115_read(int32_t *altitude, int16_t *temperature);
+	void MPL3115_toggleOneShot();
 	
 	float cal[16]; // 0-8=offsets, 9=field strength, 10-15=soft iron map
 	int16_t accel_mag_raw[6];
 	int16_t gyro_raw[3];
 	int16_t temperature_raw;
 	uint8_t newdata;
-	
-	// Specify MPL3115 Altimeter settings
-	uint8_t SAMPLERATE = OS_512ms;
-	uint8_t ST_VALUE   = ATS_4s;
-	int AltimeterMode  = 0;        // use to choose between altimeter and barometer modes for FIFO data
-	uint16_t def_sea_press = 1013.25;
 };
 
 
@@ -173,6 +124,17 @@ public:
 		float q2; // y
 		float q3; // z
 	} Quaternion_t;
+    
+	void getQuaternion(float quat[4]) { 
+		quat[0] = qPl.q0; 
+		quat[1] = qPl.q1; 
+		quat[2] = qPl.q2; 
+		quat[3] = qPl.q3; 
+	}
+    
+    float getHeading() { return RhoPl; } // compass (deg)
+    float getTilt() { return ChiPl;}    // tilt from vertical 
+    
 	// These are Madgwick & Mahony - extrinsic rotation reference (wrong!)
 	//float getPitch() {return atan2f(2.0f * qPl.q2 * qPl.q3 - 2.0f * qPl.q0 * qPl.q1, 2.0f * qPl.q0 * qPl.q0 + 2.0f * qPl.q3 * qPl.q3 - 1.0f);};
 	//float getRoll() {return -1.0f * asinf(2.0f * qPl.q1 * qPl.q3 + 2.0f * qPl.q0 * qPl.q2);};
