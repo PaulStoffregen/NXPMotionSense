@@ -86,6 +86,12 @@ public:
 		}
 		if (fieldstrength != NULL) *fieldstrength = cal[9];
 	}
+	
+	void setSeaPressure(float pascal);
+	void readPressure();
+	void readAltitude();
+	float altitudeM, temperatureC, pressure;
+	
 private:
 	void update();
 	bool FXOS8700_begin();
@@ -93,7 +99,8 @@ private:
 	bool MPL3115_begin();
 	bool FXOS8700_read(int16_t *data);
 	bool FXAS21002_read(int16_t *data);
-	bool MPL3115_read(int32_t *altitude, int16_t *temperature);
+	void MPL3115_toggleOneShot();
+	
 	float cal[16]; // 0-8=offsets, 9=field strength, 10-15=soft iron map
 	int16_t accel_mag_raw[6];
 	int16_t gyro_raw[3];
@@ -116,6 +123,17 @@ public:
 		float q2; // y
 		float q3; // z
 	} Quaternion_t;
+    
+	void getQuaternion(float quat[4]) { 
+		quat[0] = qPl.q0; 
+		quat[1] = qPl.q1; 
+		quat[2] = qPl.q2; 
+		quat[3] = qPl.q3; 
+	}
+    
+    float getHeading() { return RhoPl; } // compass (deg)
+    float getTilt() { return ChiPl;}    // tilt from vertical 
+    
 	// These are Madgwick & Mahony - extrinsic rotation reference (wrong!)
 	//float getPitch() {return atan2f(2.0f * qPl.q2 * qPl.q3 - 2.0f * qPl.q0 * qPl.q1, 2.0f * qPl.q0 * qPl.q0 + 2.0f * qPl.q3 * qPl.q3 - 1.0f);};
 	//float getRoll() {return -1.0f * asinf(2.0f * qPl.q1 * qPl.q3 + 2.0f * qPl.q0 * qPl.q2);};
