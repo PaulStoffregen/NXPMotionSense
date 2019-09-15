@@ -231,7 +231,7 @@ bool NXPMotionSense::MPL3115_begin() // pressure
 	if (!write_reg(i2c_addr, MPL3115_CTRL_REG1, 0)) return false;
 
 	// switch to active, altimeter mode, 512 ms measurement, polling mode
-	if (!write_reg(i2c_addr, MPL3115_CTRL_REG1, 0xB9)) return false;
+	if (!write_reg(i2c_addr, MPL3115_CTRL_REG1, 0xa9)) return false;
 	// enable events
 	if (!write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07)) return false;
 
@@ -241,60 +241,58 @@ bool NXPMotionSense::MPL3115_begin() // pressure
 
 bool NXPMotionSense::MPL3115_read(int32_t *altitude, int16_t *temperature)
 {
-	static elapsedMicros usec_since;
-	static int32_t usec_history=980000;
+	//static elapsedMicros usec_since;
+	//static int32_t usec_history=980000;
 	const uint8_t i2c_addr=MPL3115_I2C_ADDR;
 	uint8_t buf[6];
 
-	int32_t usec = usec_since;
-	if (usec + 500 < usec_history) return false;
-
-	if (!read_regs(i2c_addr, FXAS21002_STATUS, buf, 1)) 
-		return false;
-	if (buf[0] == 0) return false;
-
-	if (!read_regs(i2c_addr, buf, 6)) return false;
-
-	usec_since -= usec;
-	int diff = (usec - usec_history) >> 3;
-	if (diff < -1000) diff = -1000;
-	else if (diff > 1000) diff = 1000;
-	usec_history += diff;
-	
-	//int32_t a = ((uint32_t)buf[1] << 12) | ((uint16_t)buf[2] << 4) | (buf[3] >> 4);
-	//if (a & 0x00080000) a |= 0xFFF00000;
-	//*altitude = a;
-	//*temperature = (int16_t)((buf[4] << 8) | buf[5]);
-	
-	// Calculate altitude, check for negative sign in altimeter data
-	long foo = 0;
-
-	if(buf[1] > 0x7F) {
-	   foo = ~((long)buf[1] << 16 | (long)buf[2] << 8 | (long)(buf[3]) + 1); // 2's complement the data
-	   altitudeM = (float) (foo >> 8) + (float)((buf[3] >> 4)/16.0); // Whole number plus fraction altitude in meters for negative altitude
-	   altitudeM *= -1.;
-	}
-	else {
-	   foo = ((buf[1] << 8) | buf[2]);
-	   altitudeM = (float) (foo) + (float) ((buf[3] >> 4)/16.0);  // Whole number plus fraction altitude in meters
-	}
-	 	
-	// Calculate temperature, check for negative sign
-	foo = 0;
-	if(buf[4] > 0x7F) {
-	 foo = ~(buf[4] << 8 | buf[5]) + 1 ; // 2's complement
-	 temperatureC = (float) (foo >> 8) + (float)((buf[5] >> 4)/16.0); // add whole and fractional degrees Centigrade
-	 temperatureC *= -1.;
-	 }
-	else {
-	   temperatureC = (float) (buf[4]) + (float)((buf[5] >> 4)/16.0); // add whole and fractional degrees Centigrade
-	}
+	readAltitude();
 
 	altimeter_rdy = 1;
 	//Serial.printf("%02X %d %d: ", buf[0], usec, usec_history);
 	//Serial.printf("%f,%f", altitudeM, tempC);
 	//Serial.println();
 	return true;
+}
+
+void NXPMotionSense::readAltitude()
+{
+	
+  uint8_t rawData[5];  // msb/csb/lsb pressure and msb/lsb temperature stored in five contiguous registers 
+
+
+ while ((read_reg(MPL3115_I2C_ADDR, MPL3115_STATUS) & 0x08) == 0);  MPL3115_toggleOneShot(); 
+  
+  read_regs(MPL3115_I2C_ADDR, MPL3115_OUT_P_MSB, &rawData[0], 5);  // Read the five raw data registers into data array
+
+// Altutude bytes-whole altitude contained defined by msb, csb, and first two bits of lsb, fraction by next two bits of lsb
+  uint8_t msbA = rawData[0];
+  uint8_t csbA = rawData[1];
+  uint8_t lsbA = rawData[2];
+// Temperature bytes
+  uint8_t msbT = rawData[3];
+  uint8_t lsbT = rawData[4];
+ 
+ // Calculate altitude, check for negative sign in altimeter data
+ long foo = 0;
+ if(msbA > 0x7F) {
+   foo = ~((long)msbA << 16 | (long)csbA << 8 | (long)lsbA) + 1; // 2's complement the data
+   altitudeM = (float) (foo >> 8) + (float) ((lsbA >> 4)/16.0); // Whole number plus fraction altitude in meters for negative altitude
+   altitudeM *= -1.;
+ }
+ else {
+   altitudeM = (float) ( (msbA << 8) | csbA) + (float) ((lsbA >> 4)/16.0);  // Whole number plus fraction altitude in meters
+ }
+
+// Calculate temperature, check for negative sign
+if(msbT > 0x7F) {
+ foo = ~(msbT << 8 | lsbT) + 1 ; // 2's complement
+ temperatureC = (float) (foo >> 8) + (float)((lsbT >> 4)/16.0); // add whole and fractional degrees Centigrade
+ temperatureC *= -1.;
+ }
+ else {
+   temperatureC = (float) (msbT) + (float)((lsbT >> 4)/16.0); // add whole and fractional degrees Centigrade
+}
 }
 
 void NXPMotionSense::readPressure()
@@ -304,8 +302,8 @@ void NXPMotionSense::readPressure()
 	//switch to pressure mode
 	// place into standby mode
 	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0);
-	// switch to active, altimeter mode, 512 ms measurement, polling mode
-	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0x39);
+	// switch to active, altimeter mode, 32 ms measurement, polling mode
+	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0x29);
 	// enable events
 	write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07);
 
@@ -337,8 +335,8 @@ void NXPMotionSense::readPressure()
 	//switch back to altimeter mode
 	// place into standby mode
 	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0);
-	// switch to active, altimeter mode, 512 ms measurement, polling mode
-	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0xB9);
+	// switch to active, altimeter mode, 32 ms measurement, polling mode
+	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0xa9);
 	// enable events
 	write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07);
 	

@@ -89,6 +89,7 @@ public:
 	
 	void setSeaPressure(float pascal);
 	void readPressure();
+	void readAltitude();
 	float altitudeM, temperatureC, pressure;
 	uint8_t altimeter_rdy = 0;
 	
