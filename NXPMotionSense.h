@@ -86,6 +86,15 @@ public:
 		}
 		if (fieldstrength != NULL) *fieldstrength = cal[9];
 	}
+	
+	void setSeaPressure(float pascal);
+	void readPressure();
+	void readAltitude();
+	void MPL3115_toggleOneShot();
+	void readOneShotAlt();
+	void setOversampleRate();
+	float altitudeM, temperatureC, pressure;
+	
 private:
 	void update();
 	bool FXOS8700_begin();
@@ -122,6 +131,10 @@ public:
 		quat[2] = qPl.q2;
 		quat[3] = qPl.q3;
 	}
+	
+	float getHeading() { return RhoPl; } // compass deg
+	float getTilt() { return ChiPl; }    // tilt from vertical
+	
 	// These are Madgwick & Mahony - extrinsic rotation reference (wrong!)
 	//float getPitch() {return atan2f(2.0f * qPl.q2 * qPl.q3 - 2.0f * qPl.q0 * qPl.q1, 2.0f * qPl.q0 * qPl.q0 + 2.0f * qPl.q3 * qPl.q3 - 1.0f);};
 	//float getRoll() {return -1.0f * asinf(2.0f * qPl.q1 * qPl.q3 + 2.0f * qPl.q0 * qPl.q2);};
