@@ -54,12 +54,12 @@ bool NXPMotionSense::begin()
 void NXPMotionSense::update()
 {
 	static elapsedMillis msec;
-	int32_t alt;
+	//int32_t alt;
 
 	if (FXOS8700_read(accel_mag_raw)) { // accel + mag
 		//Serial.println("accel+mag");
 	}
-	if (MPL3115_read(&alt, &temperature_raw)) { // alt
+	//if (MPL3115_read(&alt, &temperature_raw)) { // alt
 		//Serial.println("alt");
 	}
 	if (FXAS21002_read(gyro_raw)) {  // gyro
@@ -77,22 +77,26 @@ static bool write_reg(uint8_t i2c, uint8_t addr, uint8_t val)
 	return Wire.endTransmission() == 0;
 }
 
+uint8_t read_reg(uint8_t address, uint8_t subAddress) 
+{
+  	uint8_t data;                    // `data` will store the register data
+  	Wire.beginTransmission(address); // Initialize the Tx buffer
+  	Wire.write(subAddress);          // Put slave register address in Tx buffer
+  	Wire.endTransmission(false); // Send the Tx buffer, but send a restart to keep connection alive
+  	delayMicroseconds(250);
+  	// Wire.endTransmission(I2C_NOSTOP);        // Send the Tx buffer, but send a
+  	// restart to keep connection alive
+  	Wire.requestFrom(address,
+                   (size_t)1); // Read one byte from slave register address
+  	data = Wire.read();          // Fill Rx buffer with result
+  	return data;                 // Return data read from slave register
+}
+
 static bool read_regs(uint8_t i2c, uint8_t addr, uint8_t *data, uint8_t num)
 {
 	Wire.beginTransmission(i2c);
 	Wire.write(addr);
 	if (Wire.endTransmission(false) != 0) return false;
-	Wire.requestFrom(i2c, num);
-	if (Wire.available() != num) return false;
-	while (num > 0) {
-		*data++ = Wire.read();
-		num--;
-	}
-	return true;
-}
-
-static bool read_regs(uint8_t i2c, uint8_t *data, uint8_t num)
-{
 	Wire.requestFrom(i2c, num);
 	if (Wire.available() != num) return false;
 	while (num > 0) {
@@ -225,37 +229,181 @@ bool NXPMotionSense::MPL3115_begin() // pressure
 	return true;
 }
 
-bool NXPMotionSense::MPL3115_read(int32_t *altitude, int16_t *temperature)
-{
-	static elapsedMicros usec_since;
-	static int32_t usec_history=980000;
-	const uint8_t i2c_addr=MPL3115_I2C_ADDR;
-	uint8_t buf[6];
-
-	int32_t usec = usec_since;
-	if (usec + 500 < usec_history) return false;
-
-	if (!read_regs(i2c_addr, FXAS21002_STATUS, buf, 1)) return false;
-	if (buf[0] == 0) return false;
-
-	if (!read_regs(i2c_addr, buf, 6)) return false;
-
-	usec_since -= usec;
-	int diff = (usec - usec_history) >> 3;
-	if (diff < -1000) diff = -1000;
-	else if (diff > 1000) diff = 1000;
-	usec_history += diff;
-
-	int32_t a = ((uint32_t)buf[1] << 12) | ((uint16_t)buf[2] << 4) | (buf[3] >> 4);
-	if (a & 0x00080000) a |= 0xFFF00000;
-	*altitude = a;
-	*temperature = (int16_t)((buf[4] << 8) | buf[5]);
-
-	//Serial.printf("%02X %d %d: ", buf[0], usec, usec_history);
-	//Serial.printf("%6d,%6d", a, *temperature);
-	//Serial.println();
-	return true;
+void NXPMotionSense::readAltitude() //simplest way to get altitude
+{  
+  	// but slower. Does nothing while waiting for results from toggleOneShot readings from baro
+  	MPL3115_toggleOneShot();  //starts altitude calcs on baro
+  	readOneShotAlt();	    //gets alt and temperature results from baro
 }
+
+void NXPMotionSense::readOneShotAlt() //gets alt and temp results from baro
+{ 
+  	//after readAltitude()
+  	// or can be used after MPL3115_toggleOneShot() has been called for in your .ino
+
+  	uint8_t rawData[5]; // msb/csb/lsb pressure and msb/lsb temperature stored in
+                      // five contiguous registers
+  	// when below == 1: A new set of data is ready
+  	while ((read_reg(MPL3115_I2C_ADDR, MPL3115_STATUS) & 0x08) == 0);
+
+
+  	read_regs(MPL3115_I2C_ADDR, MPL3115_OUT_P_MSB, &rawData[0],
+            5); // Read the five raw data registers into data array
+
+  	// Altutude bytes-whole altitude contained defined by msb, csb, and first two
+  	// bits of lsb, fraction by next two bits of lsb
+  	uint8_t msbA = rawData[0];
+  	uint8_t csbA = rawData[1];
+  	uint8_t lsbA = rawData[2];
+  	// Temperature bytes
+  	uint8_t msbT = rawData[3];
+  	uint8_t lsbT = rawData[4];
+
+  	// Calculate altitude, check for negative sign in altimeter data
+  	long foo = 0;
+  	if (msbA > 0x7F) {
+  	  foo = ~((long)msbA << 16 | (long)csbA << 8 | (long)lsbA) +
+            	1; // 2's complement the data
+    	  altitudeM =
+        	(float)(foo >> 8) +
+        	(float)((lsbA >> 4) / 16.0); // Whole number plus fraction altitude in
+                                     // meters for negative altitude
+    	  altitudeM *= -1.;
+  	} else {
+    	  altitudeM = (float)((msbA << 8) | csbA) +
+                (float)((lsbA >> 4) /
+                        16.0); // Whole number plus fraction altitude in meters
+  	}
+
+  	// Calculate temperature, check for negative sign
+  	if (msbT > 0x7F) {
+    		foo = ~(msbT << 8 | lsbT) + 1; // 2's complement
+    		temperatureC = (float)(foo >> 8) +
+                   (float)((lsbT >> 4) /
+                           16.0); // add whole and fractional degrees Centigrade
+    		temperatureC *= -1.;
+  	} else {
+    		temperatureC = (float)(msbT) +
+                   (float)((lsbT >> 4) /
+                           16.0); // add whole and fractional degrees Centigrade
+  	}
+}
+
+void NXPMotionSense::readPressure() {
+  	const uint8_t i2c_addr = MPL3115_I2C_ADDR;
+
+  	// switch to pressure mode
+  	//  place into standby mode
+  	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0);
+  	// switch to active, altimeter mode, 32 ms measurement, polling mode
+  	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0x29);
+  	// enable events
+  	write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07);
+
+  	byte rawData[5]; // msb/csb/lsb pressure and msb/lsb temperature stored in
+                   // five contiguous registers
+
+  	while ((read_reg(MPL3115_I2C_ADDR, MPL3115_STATUS) & 0x08) == 0);
+  	MPL3115_toggleOneShot();
+
+  	read_regs(MPL3115_I2C_ADDR, MPL3115_OUT_P_MSB, &rawData[0],
+            5); // Read the five raw data registers into data array
+
+  	// Pressure bytes
+  	uint8_t msbP = rawData[0];
+  	uint8_t csbP = rawData[1];
+  	uint8_t lsbP = rawData[2];
+  	// Temperature bytes
+  	uint8_t msbT = rawData[3];
+  	uint8_t lsbT = rawData[4];
+
+  	long pressure_whole = ((long)msbP << 16 | (long)csbP << 8 |
+        	(long)lsbP); // Construct whole number pressure
+  	pressure_whole >>= 6; // Only two most significant bits of lsbP contribute to
+                        // whole pressure; its an 18-bit number
+
+  	lsbP &= 0x30; // Keep only bits 5 and 6, the fractional pressure
+  	lsbP >>= 4; // Shift to get the fractional pressure in terms of quarters of a
+              // Pascal
+  	float pressure_frac =
+      		(float)lsbP / 4.0; // Convert numbers of fractional quarters to fractional
+                         // pressure n Pasacl
+
+  	pressure = (float)(pressure_whole) +
+        	pressure_frac; // Combine whole and fractional parts to get entire
+                            // pressure in Pascal
+  	pressure = pressure / 100.0f;
+
+  	// Calculate temperature, check for negative sign
+  	long foo = 0;
+  	if (msbT > 0x7F) {
+  		foo = ~(msbT << 8 | lsbT) + 1; // 2's complement
+    	temperatureC = (float)(foo >> 8) +
+        	(float)((lsbT >> 4) /
+                	16.0); // add whole and fractional degrees Centigrade
+    	temperatureC *= -1.;
+  	} else {
+    		temperatureC = (float)(msbT) +
+                	(float)((lsbT >> 4) /
+                        	16.0); // add whole and fractional degrees Centigrade
+  	}
+
+  	// switch back to altimeter mode
+  	//  place into standby mode
+  	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0);
+  	// switch to active, altimeter mode, 10 ms measurement, polling mode
+  	write_reg(i2c_addr, MPL3115_CTRL_REG1, 0x89);
+  	// enable events
+  	write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07);
+}
+
+	/*!
+	 *  @brief Set the oversample rate
+	 *  @param sampleRate oversample rate from 0 to 7
+	 * The higher the oversample rate the more time between samples
+	 */
+void NXPMotionSense::setOversampleRate(int8_t sampleRate) 
+{
+	if (sampleRate > 7)
+	sampleRate = 7; // OS cannot be larger than 0b.0111
+	sampleRate <<= 3; // Align it for the CTRL_REG1 register
+
+  	int8_t tempSetting =
+	read_reg(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1); // Read current settings
+	tempSetting &= 0xc7;       // B11000111; //Clear out old OS bits
+	tempSetting |= sampleRate; // Mask in new OS bits
+	write_reg(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1, tempSetting);
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Clears then sets OST bit which causes the sensor to immediately take another
+// reading
+void NXPMotionSense::MPL3115_toggleOneShot() 
+{
+  	// MPL3115_Active();  // Set to active to start reading
+  	byte c;
+  	read_regs(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1, &c, 1);
+  	write_reg(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1,
+            c & ~(1 << 1)); // Clear OST (bit 1)
+  	read_regs(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1, &c, 1);
+  	write_reg(MPL3115_I2C_ADDR, MPL3115_CTRL_REG1,
+            c | (1 << 1)); // Set OST bit to 1
+}
+
+	/*!
+	 *  @brief  Set the local sea level barometric pressure
+	 *  @param pascal the pressure to use as the baseline
+	 */
+
+void NXPMotionSense::setSeaPressure(float pascal) 
+{
+  	uint16_t bar = pascal / 2;
+  	Wire.beginTransmission(MPL3115_I2C_ADDR);
+  	Wire.write((uint8_t)MPL3115_BAR_IN_MSB);
+  	Wire.write((uint8_t)(bar >> 8));
+  	Wire.write((uint8_t)bar);
+  	Wire.endTransmission(false);
+}	
 
 bool NXPMotionSense::writeCalibration(const void *data)
 {
