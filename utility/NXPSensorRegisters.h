@@ -151,7 +151,7 @@
 #define MPL3115_OUT_T_MSB            0x04 // Temperature Data Out MSB
 #define MPL3115_OUT_T_LSB            0x05 // Temperature Data Out LSB
 #define MPL3115_DR_STATUS            0x06 // Sensor Status Register
-#define MPL3115_OUT_P_DELTA MSB      0x07 // Pressure Data Out Delta MSB
+#define MPL3115_OUT_P_DELTA_MSB      0x07 // Pressure Data Out Delta MSB
 #define MPL3115_OUT_P_DELTA_CSB      0x08 // Pressure Data Out Delta CSB
 #define MPL3115_OUT_P_DELTA_LSB      0x09 // Pressure Data Out Delta LSB
 #define MPL3115_OUT_T_DELTA_MSB      0x0A // Temperature Data Out Delta MSB
