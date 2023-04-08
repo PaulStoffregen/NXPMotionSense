@@ -92,7 +92,7 @@ public:
 	void readAltitude();
 	void MPL3115_toggleOneShot();
 	void readOneShotAlt();
-	void setOversampleRate();
+	void setOversampleRate(int8_t sampleRate);
 	float altitudeM, temperatureC, pressure;
 	
 private:
