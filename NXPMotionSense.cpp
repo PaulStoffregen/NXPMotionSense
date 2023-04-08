@@ -59,9 +59,9 @@ void NXPMotionSense::update()
 	if (FXOS8700_read(accel_mag_raw)) { // accel + mag
 		//Serial.println("accel+mag");
 	}
-	if (MPL3115_read(&alt, &temperature_raw)) { // alt
+	//if (MPL3115_read(&alt, &temperature_raw)) { // alt
 		//Serial.println("alt");
-	}
+	//}
 	if (FXAS21002_read(gyro_raw)) {  // gyro
 		//Serial.println("gyro");
 		newdata = 1;
