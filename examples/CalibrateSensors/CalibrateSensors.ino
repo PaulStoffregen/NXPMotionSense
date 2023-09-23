@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <EEPROM.h>
 #include <util/crc16.h>
-
+#include "elapsedMillis.h"
 NXPMotionSense imu;
 
 const int ledPin = 13;
@@ -15,7 +15,8 @@ void receiveCalibration();
 void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for serial port open
-  imu.begin();
+  imu.begin(FXOS8700_I2C_ADDR3, FXAS21002_I2C_ADDR1, MPL3115_I2C_ADDR, false);
+
   pinMode(ledPin, OUTPUT);
 }
 
@@ -148,6 +149,4 @@ void receiveCalibration() {
     }
   }
 }
-
-
 

@@ -10,9 +10,10 @@ void setup() {
   float fieldStrength;
   int i, j;
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial) ; // wait for serial port open
-  imu.begin();
+  
+  imu.begin(FXOS8700_I2C_ADDR3, FXAS21002_I2C_ADDR1, MPL3115_I2C_ADDR, false);
   Serial.println("Calibration Data");
   Serial.println();
   imu.getCalibration(offsets, softIron, &fieldStrength);
