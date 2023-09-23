@@ -11,13 +11,18 @@ void NXPMotionSense::OutputConfig()
 	Serial.printf("NXPMotionSense config:\n");
 	Serial.printf("\tFXOS8700 address: 0x%02X\n",_i2cAddressFxos8700);
 	Serial.printf("\tFXAS21002 address: 0x%02X\n",_i2cAddressFxas21002);
-	Serial.printf("\tMPL311 address: 0x%02X, (%s)\n",_i2cAddressFxas21002, _useTemperatureSensor? "Enabled": "Disabled");
+	Serial.printf("\tMPL311 address: 0x%02X, (%s)\n",_i2cAddressMPL3115, _useTemperatureSensor? "Enabled": "Disabled");
 }
 
 
 bool NXPMotionSense::begin()
 {
 	return begin(FXOS8700_I2C_ADDR0, FXAS21002_I2C_ADDR0, MPL3115_I2C_ADDR);
+}
+
+bool NXPMotionSense::begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002)
+{
+	return begin(i2cAddressFxos8700, i2cAddressFxas21002, 0x00, false);	
 }
 
 bool NXPMotionSense::begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311)

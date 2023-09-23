@@ -15,7 +15,7 @@ void receiveCalibration();
 void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for serial port open
-  imu.begin(FXOS8700_I2C_ADDR3, FXAS21002_I2C_ADDR1, MPL3115_I2C_ADDR, false);
+  imu.begin(FXOS8700_I2C_ADDR3, FXAS21002_I2C_ADDR1);
 
   pinMode(ledPin, OUTPUT);
 }

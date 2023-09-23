@@ -13,6 +13,7 @@
 class NXPMotionSense {
 public:
 	bool begin();
+	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002);
 	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311);
 	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311, bool useTemperatureSensor);
 	void OutputConfig();
