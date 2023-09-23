@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <EEPROM.h>
-
+#include "utility/NXPSensorRegisters.h"
 // TODO: move these inside class namespace
 #define G_PER_COUNT            0.0001220703125f  // = 1/8192
 #define DEG_PER_SEC_PER_COUNT  0.0625f  // = 1/16
@@ -13,6 +13,10 @@
 class NXPMotionSense {
 public:
 	bool begin();
+	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002);
+	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311);
+	bool begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311, bool useTemperatureSensor);
+	void OutputConfig();
 	bool available() {
 		update();
 		if (newdata) return true;
@@ -89,8 +93,11 @@ public:
 private:
 	void update();
 	bool FXOS8700_begin();
+	bool FXOS8700_begin(const uint8_t i2c_addr);
 	bool FXAS21002_begin();
+	bool FXAS21002_begin(const uint8_t i2c_addr);
 	bool MPL3115_begin();
+	bool MPL3115_begin(const uint8_t i2c_addr);
 	bool FXOS8700_read(int16_t *data);
 	bool FXAS21002_read(int16_t *data);
 	bool MPL3115_read(int32_t *altitude, int16_t *temperature);
@@ -99,6 +106,11 @@ private:
 	int16_t gyro_raw[3];
 	int16_t temperature_raw;
 	uint8_t newdata;
+	uint8_t _i2cAddressFxos8700 = FXOS8700_I2C_ADDR0;
+	uint8_t _i2cAddressFxas21002 = FXAS21002_I2C_ADDR0;
+	uint8_t _i2cAddressMPL3115 = MPL3115_I2C_ADDR;
+	bool _useTemperatureSensor = true;
+
 };
 
 

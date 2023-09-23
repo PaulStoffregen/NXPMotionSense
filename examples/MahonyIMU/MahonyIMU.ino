@@ -13,7 +13,7 @@ Mahony filter;
 
 void setup() {
   Serial.begin(9600);
-  imu.begin();
+  imu.begin(FXOS8700_I2C_ADDR3, FXAS21002_I2C_ADDR1, MPL3115_I2C_ADDR, false);
   filter.begin(100); // 100 measurements per second
 }
 

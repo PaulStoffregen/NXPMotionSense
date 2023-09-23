@@ -6,8 +6,40 @@
 #define NXP_MOTION_CAL_EEADDR  60
 #define NXP_MOTION_CAL_SIZE    68
 
+void NXPMotionSense::OutputConfig()
+{
+	Serial.printf("NXPMotionSense config:\n");
+	Serial.printf("\tFXOS8700 address: 0x%02X\n",_i2cAddressFxos8700);
+	Serial.printf("\tFXAS21002 address: 0x%02X\n",_i2cAddressFxas21002);
+	Serial.printf("\tMPL311 address: 0x%02X, (%s)\n",_i2cAddressMPL3115, _useTemperatureSensor? "Enabled": "Disabled");
+}
+
+
 bool NXPMotionSense::begin()
 {
+	return begin(FXOS8700_I2C_ADDR0, FXAS21002_I2C_ADDR0, MPL3115_I2C_ADDR);
+}
+
+bool NXPMotionSense::begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002)
+{
+	return begin(i2cAddressFxos8700, i2cAddressFxas21002, 0x00, false);	
+}
+
+bool NXPMotionSense::begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL311)
+{
+
+	return begin(i2cAddressFxos8700, i2cAddressFxas21002, i2cAddressMPL311, true);
+}
+
+
+bool NXPMotionSense::begin(const uint8_t i2cAddressFxos8700, const uint8_t i2cAddressFxas21002, const uint8_t i2cAddressMPL3115, bool useTemperatureSensor)
+{
+	_i2cAddressFxos8700 = i2cAddressFxos8700;
+	_i2cAddressFxas21002 = i2cAddressFxas21002;
+	_i2cAddressMPL3115 = i2cAddressMPL3115;
+	_useTemperatureSensor = useTemperatureSensor;
+	OutputConfig();
+	
 	unsigned char buf[NXP_MOTION_CAL_SIZE];
 	uint8_t i;
 	uint16_t crc;
@@ -18,20 +50,19 @@ bool NXPMotionSense::begin()
 	memset(accel_mag_raw, 0, sizeof(accel_mag_raw));
 	memset(gyro_raw, 0, sizeof(gyro_raw));
 
-	//Serial.println("init hardware");
-	while (!FXOS8700_begin()) {
+	while (!FXOS8700_begin(_i2cAddressFxos8700)) {
 		Serial.println("config error FXOS8700");
 		delay(1000);
 	}
-	while (!FXAS21002_begin()) {
+	while (!FXAS21002_begin(_i2cAddressFxas21002)) {
 		Serial.println("config error FXAS21002");
 		delay(1000);
 	}
-	while (!MPL3115_begin()) {
+	
+	while (_useTemperatureSensor && !MPL3115_begin(_i2cAddressMPL3115)) {
 		Serial.println("config error MPL3115");
 		delay(1000);
 	}
-	//Serial.println("init done");
 
 	for (i=0; i < NXP_MOTION_CAL_SIZE; i++) {
 		buf[i] = EEPROM.read(NXP_MOTION_CAL_EEADDR + i);
@@ -46,8 +77,8 @@ bool NXPMotionSense::begin()
 		memset(cal, 0, sizeof(cal));
 		cal[9] = 50.0f;
 	}
+	
 	return true;
-
 }
 
 
@@ -57,13 +88,17 @@ void NXPMotionSense::update()
 	int32_t alt;
 
 	if (FXOS8700_read(accel_mag_raw)) { // accel + mag
-		//Serial.println("accel+mag");
+		//Serial.printf("accel+mag\n");
 	}
-	if (MPL3115_read(&alt, &temperature_raw)) { // alt
-		//Serial.println("alt");
+	if (_useTemperatureSensor)
+	{
+		if (MPL3115_read(&alt, &temperature_raw)) { // alt
+			Serial.println("alt");
+		}
 	}
+	
 	if (FXAS21002_read(gyro_raw)) {  // gyro
-		//Serial.println("gyro");
+		//Serial.printf("gyro\n");
 		newdata = 1;
 	}
 }
@@ -104,24 +139,56 @@ static bool read_regs(uint8_t i2c, uint8_t *data, uint8_t num)
 
 bool NXPMotionSense::FXOS8700_begin()
 {
-	const uint8_t i2c_addr=FXOS8700_I2C_ADDR0;
+	return FXOS8700_begin(FXOS8700_I2C_ADDR0);
+}
+
+bool NXPMotionSense::FXOS8700_begin(const uint8_t i2c_addr)
+{
+	_i2cAddressFxos8700 = i2c_addr;
 	uint8_t b;
 
-	//Serial.println("FXOS8700_begin");
 	// detect if chip is present
-	if (!read_regs(i2c_addr, FXOS8700_WHO_AM_I, &b, 1)) return false;
-	//Serial.printf("FXOS8700 ID = %02X\n", b);
+	if (!read_regs(_i2cAddressFxos8700, FXOS8700_WHO_AM_I, &b, 1))
+	{
+		Serial.printf("FXOS8700 WHO_AM_I failed\n");
+		return false;
+	}
+	Serial.printf("FXOS8700 ID = %02X\n", b);
 	if (b != 0xC7) return false;
 	// place into standby mode
-	if (!write_reg(i2c_addr, FXOS8700_CTRL_REG1, 0)) return false;
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_CTRL_REG1, 0)) 
+	{
+		Serial.printf("FXOS8700_CTRL_REG1 failed\n");
+		return false;
+	}
 	// configure magnetometer
-	if (!write_reg(i2c_addr, FXOS8700_M_CTRL_REG1, 0x1F)) return false;
-	if (!write_reg(i2c_addr, FXOS8700_M_CTRL_REG2, 0x20)) return false;
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_M_CTRL_REG1, 0x1F))
+	{
+		Serial.printf("FXOS8700_M_CTRL_REG1 failed\n");
+		return false;
+	}
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_M_CTRL_REG2, 0x20))
+	{
+		Serial.printf("FXOS8700_M_CTRL_REG2 failed\n");
+		return false;
+	}
 	// configure accelerometer
-	if (!write_reg(i2c_addr, FXOS8700_XYZ_DATA_CFG, 0x01)) return false; // 4G range
-	if (!write_reg(i2c_addr, FXOS8700_CTRL_REG2, 0x02)) return false; // hires
-	if (!write_reg(i2c_addr, FXOS8700_CTRL_REG1, 0x15)) return false; // 100Hz A+M
-	//Serial.println("FXOS8700 Configured");
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_XYZ_DATA_CFG, 0x01))	
+	{
+		Serial.printf("FXOS8700_XYZ_DATA_CFG failed\n");
+		return false;// 4G range
+	} 
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_CTRL_REG2, 0x02))
+	{
+		Serial.printf("FXOS8700_CTRL_REG2 failed\n");
+		return false;// hires
+	} 
+
+	if (!write_reg(_i2cAddressFxos8700, FXOS8700_CTRL_REG1, 0x15))
+	{
+		Serial.printf("FXOS8700_CTRL_REG1 failed\n");
+		return false;// 100Hz A+M
+	} 
 	return true;
 }
 
@@ -129,13 +196,12 @@ bool NXPMotionSense::FXOS8700_read(int16_t *data)  // accel + mag
 {
 	static elapsedMicros usec_since;
 	static int32_t usec_history=5000;
-	const uint8_t i2c_addr=FXOS8700_I2C_ADDR0;
 	uint8_t buf[13];
 
 	int32_t usec = usec_since;
 	if (usec + 100 < usec_history) return false;
 
-	if (!read_regs(i2c_addr, FXOS8700_STATUS, buf, 1)) return false;
+	if (!read_regs(_i2cAddressFxos8700, FXOS8700_STATUS, buf, 1)) return false;
 	if (buf[0] == 0) return false;
 
 	usec_since -= usec;
@@ -144,8 +210,8 @@ bool NXPMotionSense::FXOS8700_read(int16_t *data)  // accel + mag
 	else if (diff > 15) diff = 15;
 	usec_history += diff;
 
-	if (!read_regs(i2c_addr, FXOS8700_OUT_X_MSB, buf+1, 12)) return false;
-	//if (!read_regs(i2c_addr, buf, 13)) return false;
+	if (!read_regs(_i2cAddressFxos8700, FXOS8700_OUT_X_MSB, buf+1, 12)) return false;
+	//if (!read_regs(_i2cAddressFxos8700, buf, 13)) return false;
 
 	data[0] = (int16_t)((buf[1] << 8) | buf[2]);
 	data[1] = (int16_t)((buf[3] << 8) | buf[4]);
@@ -158,18 +224,27 @@ bool NXPMotionSense::FXOS8700_read(int16_t *data)  // accel + mag
 
 bool NXPMotionSense::FXAS21002_begin()
 {
-        const uint8_t i2c_addr=FXAS21002_I2C_ADDR0;
-        uint8_t b;
+	return FXAS21002_begin(FXAS21002_I2C_ADDR1);
+}
 
-	if (!read_regs(i2c_addr, FXAS21002_WHO_AM_I, &b, 1)) return false;
+bool NXPMotionSense::FXAS21002_begin(const uint8_t i2c_addr)
+{
+    _i2cAddressFxas21002=i2c_addr;
+    uint8_t b;
+
+	if (!read_regs(_i2cAddressFxas21002, FXAS21002_WHO_AM_I, &b, 1))
+	{
+		Serial.printf("FXAS21002 WHO_AM_I failed\n");
+ 		return false;
+	}
 	//Serial.printf("FXAS21002 ID = %02X\n", b);
 	if (b != 0xD7) return false;
 
 	// place into standby mode
-	if (!write_reg(i2c_addr, FXAS21002_CTRL_REG1, 0)) return false;
+	if (!write_reg(_i2cAddressFxas21002, FXAS21002_CTRL_REG1, 0)) return false;
 	// switch to active mode, 100 Hz output rate
-	if (!write_reg(i2c_addr, FXAS21002_CTRL_REG0, 0x00)) return false;
-	if (!write_reg(i2c_addr, FXAS21002_CTRL_REG1, 0x0E)) return false;
+	if (!write_reg(_i2cAddressFxas21002, FXAS21002_CTRL_REG0, 0x00)) return false;
+	if (!write_reg(_i2cAddressFxas21002, FXAS21002_CTRL_REG1, 0x0E)) return false;
 
 	//Serial.println("FXAS21002 Configured");
 	return true;
@@ -179,13 +254,12 @@ bool NXPMotionSense::FXAS21002_read(int16_t *data) // gyro
 {
 	static elapsedMicros usec_since;
 	static int32_t usec_history=10000;
-	const uint8_t i2c_addr=FXAS21002_I2C_ADDR0;
 	uint8_t buf[7];
 
 	int32_t usec = usec_since;
 	if (usec + 100 < usec_history) return false;
 
-	if (!read_regs(i2c_addr, FXAS21002_STATUS, buf, 1)) return false;
+	if (!read_regs(_i2cAddressFxas21002, FXAS21002_STATUS, buf, 1)) return false;
 	if (buf[0] == 0) return false;
 
 	usec_since -= usec;
@@ -195,8 +269,8 @@ bool NXPMotionSense::FXAS21002_read(int16_t *data) // gyro
 	usec_history += diff;
 	//Serial.println(usec);
 
-	if (!read_regs(i2c_addr, FXAS21002_STATUS, buf, 7)) return false;
-	//if (!read_regs(i2c_addr, buf, 7)) return false;
+	if (!read_regs(_i2cAddressFxas21002, FXAS21002_STATUS, buf, 7)) return false;
+	//if (!read_regs(_i2cAddressFxas21002, buf, 7)) return false;
 
 	data[0] = (int16_t)((buf[1] << 8) | buf[2]);
 	data[1] = (int16_t)((buf[3] << 8) | buf[4]);
@@ -204,41 +278,59 @@ bool NXPMotionSense::FXAS21002_read(int16_t *data) // gyro
 	return true;
 }
 
-bool NXPMotionSense::MPL3115_begin() // pressure
+bool NXPMotionSense::MPL3115_begin()
 {
-        const uint8_t i2c_addr=MPL3115_I2C_ADDR;
-        uint8_t b;
+	return MPL3115_begin(MPL3115_I2C_ADDR);
+}
 
-	if (!read_regs(i2c_addr, MPL3115_WHO_AM_I, &b, 1)) return false;
+bool NXPMotionSense::MPL3115_begin(const uint8_t i2c_addr) // pressure
+{
+	if (!_useTemperatureSensor)
+	{
+		Serial.println("MPL3115 set 'Disabled. Cannot do 'begin'.");
+		return false;
+	}
+    _i2cAddressMPL3115 = i2c_addr;
+    uint8_t b;
+
+	if (!read_regs(_i2cAddressMPL3115, MPL3115_WHO_AM_I, &b, 1))
+	{ 
+		Serial.println("MPL3115 WHO_AM_I failed\n");
+		return false;
+	}
 	//Serial.printf("MPL3115 ID = %02X\n", b);
 	if (b != 0xC4) return false;
 
 	// place into standby mode
-	if (!write_reg(i2c_addr, MPL3115_CTRL_REG1, 0)) return false;
+	if (!write_reg(_i2cAddressMPL3115, MPL3115_CTRL_REG1, 0)) return false;
 
 	// switch to active, altimeter mode, 512 ms measurement, polling mode
-	if (!write_reg(i2c_addr, MPL3115_CTRL_REG1, 0xB9)) return false;
+	if (!write_reg(_i2cAddressMPL3115, MPL3115_CTRL_REG1, 0xB9)) return false;
 	// enable events
-	if (!write_reg(i2c_addr, MPL3115_PT_DATA_CFG, 0x07)) return false;
+	if (!write_reg(_i2cAddressMPL3115, MPL3115_PT_DATA_CFG, 0x07)) return false;
 
 	//Serial.println("MPL3115 Configured");
 	return true;
 }
 
 bool NXPMotionSense::MPL3115_read(int32_t *altitude, int16_t *temperature)
-{
+{	
+	if (!_useTemperatureSensor)
+	{
+		Serial.println("MPL3115 set 'Disabled. Cannot do 'read'.");
+		return false;
+	}
 	static elapsedMicros usec_since;
 	static int32_t usec_history=980000;
-	const uint8_t i2c_addr=MPL3115_I2C_ADDR;
 	uint8_t buf[6];
 
 	int32_t usec = usec_since;
 	if (usec + 500 < usec_history) return false;
 
-	if (!read_regs(i2c_addr, FXAS21002_STATUS, buf, 1)) return false;
+	if (!read_regs(_i2cAddressMPL3115, FXAS21002_STATUS, buf, 1)) return false;
 	if (buf[0] == 0) return false;
 
-	if (!read_regs(i2c_addr, buf, 6)) return false;
+	if (!read_regs(_i2cAddressMPL3115, buf, 6)) return false;
 
 	usec_since -= usec;
 	int diff = (usec - usec_history) >> 3;
